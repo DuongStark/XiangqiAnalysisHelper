@@ -183,6 +183,7 @@ function highlightMove(uci) {
 const STARTPOS_FEN = 'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR';
 
 const STATUS_ID = 'xq-bot-status';
+const BOARD_NOT_FOUND_MESSAGE = 'Open a game board first, or refresh the page.';
 
 function ensureStatusEl() {
   let el = document.getElementById(STATUS_ID);
@@ -383,7 +384,7 @@ function pickReactionDelay(gap, score, plyCount) {
   return Math.min(delay, 6500);
 }
 
-async function requestBestMove(fen, sideToMove, movetime, plies, record = true, style = 'sparring') {
+async function requestBestMove(fen, sideToMove, movetime, plies, record = true, style = 'best') {
   const r = await fetch('http://127.0.0.1:8080/bestmove', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -393,7 +394,7 @@ async function requestBestMove(fen, sideToMove, movetime, plies, record = true, 
       plies,
       record,
       style,
-      skill: AUTO.skill,
+      skill: style === 'sparring' ? AUTO.skill : 5,
     }),
   });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -530,7 +531,7 @@ async function autoTick() {
         `<div><div style="font-size:13px; font-weight:800; color:#a62018;">Position scan</div>` +
         `<div style="font-size:11px; color:#73513a; margin-top:2px;">probe: ${probeTime}ms</div></div>`
       );
-      const probe = await requestBestMove(fen, sideToMove, probeTime, plies, false);
+      const probe = await requestBestMove(fen, sideToMove, probeTime, plies, false, 'sparring');
       movetime = Math.round(pickSearchTime(probe.gap, probe.score, plies, remainingMs));
       movetime = Math.min(movetime, Math.max(400, totalThinkCap(plies, remainingMs) - probeTime));
 
@@ -540,13 +541,13 @@ async function autoTick() {
           `<div style="font-size:11px; color:#73513a; margin-top:2px;">engine: ${movetime}ms, gap=${probe.gap ?? '?'}</div></div>`
         );
       }
-      data = await requestBestMove(fen, sideToMove, movetime, plies, true);
+      data = await requestBestMove(fen, sideToMove, movetime, plies, true, 'sparring');
     } else {
       setBotStatus(
         `<div><div style="font-size:13px; font-weight:800; color:#a62018;">Fast search</div>` +
         `<div style="font-size:11px; color:#73513a; margin-top:2px;">engine: ${movetime}ms</div></div>`
       );
-      data = await requestBestMove(fen, sideToMove, movetime, plies, true);
+      data = await requestBestMove(fen, sideToMove, movetime, plies, true, 'best');
     }
     if (data.bestmove && data.bestmove !== '(none)') {
       highlightMove(data.bestmove);
@@ -620,7 +621,13 @@ async function autoTick() {
 
 function startAuto({ movetime = 1000, skill = 4 } = {}) {
   if (AUTO.enabled) return;
-  if (!document.querySelector('#game-grid')) throw new Error('#game-grid not found');
+  if (!document.querySelector('#game-grid')) {
+    setBotStatus(
+      `<div><div style="font-size:13px; font-weight:800; color:#a62018;">Board not found</div>` +
+      `<div style="font-size:11px; color:#73513a; margin-top:2px;">${BOARD_NOT_FOUND_MESSAGE}</div></div>`
+    );
+    throw new Error(BOARD_NOT_FOUND_MESSAGE);
+  }
 
   AUTO.enabled = true;
   AUTO.movetime = movetime;

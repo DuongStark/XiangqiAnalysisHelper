@@ -8,6 +8,7 @@ const modeTitle = document.getElementById('modeTitle');
 const modeSub = document.getElementById('modeSub');
 const skillEl = document.getElementById('skill');
 const SERVER_BASE = 'http://127.0.0.1:8080';
+const BOARD_NOT_FOUND_MESSAGE = 'Open a game board first, or refresh the page.';
 
 function setStatus(msg, kind) {
   statusEl.textContent = msg;
@@ -85,7 +86,8 @@ async function startBot(tab) {
   const skill = parseInt(skillEl.value, 10);
   const auto = await chrome.tabs.sendMessage(tab.id, { type: 'AUTO_START', movetime, skill });
   if (!auto.ok) {
-    setStatus(`Auto error: ${auto.error}`, 'err');
+    const msg = auto.error === '#game-grid not found' ? BOARD_NOT_FOUND_MESSAGE : auto.error;
+    setStatus(`Auto error: ${msg}`, 'err');
     return;
   }
 
